@@ -11,6 +11,8 @@ using uint8  = std::uint8_t;
 using uint32 = std::uint32_t;    
 using uint64 = std::uint64_t;        
 
+const char* DATAFILE = "./resept.dta";
+
 //
 // @namespace JET - Jonas epic templates
 //
@@ -31,6 +33,7 @@ namespace JET {
 template<class ElementType>
 class Listx : public List
 {
+public:
     static_assert(std::is_base_of<Element, ElementType>::value, 
         "ElementType must inherit from Element, NumElement or TextElement");
 
@@ -66,8 +69,11 @@ constexpr void printline(Arg arg, Args ... args) {
 } // JET END
 
 struct Context {
-    struct Resept {
+    struct Resept : TextElement {
+
         using string = std::string;
+        using uint64 = std::uint64_t;        
+        
         string dato;
         string pasientNavn;
         string legeNavn;
@@ -75,12 +81,39 @@ struct Context {
         string legeTelefon;
         string medisinNavn;
         uint64 medisinMengde; // milligram, mg
+
+        Resept(): TextElement("default") {}
+        Resept(string _dato,
+               string _pasientNavn,
+               string _legeNavn,
+               string _legeAdresse,
+               string _legeTelefon,
+               string _medisinNavn,
+               uint64 _medisinMengde)
+        :TextElement(_pasientNavn.c_str())
+        ,dato(_dato)
+        ,pasientNavn(_pasientNavn)
+        ,legeNavn(_legeNavn)
+        ,legeAdresse(_legeAdresse)
+        ,legeTelefon(_legeTelefon)
+        ,medisinNavn(_medisinNavn)
+        ,medisinMengde(_medisinMengde)
+        {}
     };
-    std::vector<Resept> resepter{}; 
+    JET::Listx<Resept> resepter{Sorted}; 
 };
 
 struct Command {
     enum CommandCharacter : char {
+        iREGISTRER,
+        iLAG_OVERSIKT,
+        iPASIENT_OVERSIKT,
+        iMEDISIN_OVERSIKT,
+        iFJERN,
+        iUT_TIL_FIL,
+        iINN_FRA_FIL,
+        iHJELP,
+        iQUIT,
         REGISTRER = 'R',
         LAG_OVERSIKT = 'L',
         PASIENT_OVERSIKT = 'P',
@@ -93,89 +126,104 @@ struct Command {
     };
 
     enum ReturnCode : uint8 {
-        SUCCESS, ABORT, EXIT
+        CONTINUE, EXIT
     };
-
-    const char        character{};
-    using ActionType = ReturnCode (*)(Context&);    
-    const ActionType  action;
+    using ActionType = ReturnCode (*)(Command&, Context&);    
     using string = std::string;    
-    const string textHelp{};
-    const string textSuccess{};
-    const string textExit{};
-    const string textAbort{};
+
+    char character{};
+    ActionType  action;
+    string textHelp{};
+    string textStatus{};
+
+    auto status(ReturnCode code, const char* statusMsg) -> ReturnCode {
+        textStatus = statusMsg;
+        return code;
+    }
 };
 
 
 namespace Action {
-auto registrerNyResept(Context& ctx) -> Command::ReturnCode { 
+auto registrerNyResept(Command& cmd, Context& ctx) -> Command::ReturnCode { 
 
-    constexpr auto getline = [](const auto msg, std::string& line){
+    constexpr auto getline = [](const auto msg) -> std::string {
+        std::string line{};
         std::cout << msg << " : ";
         std::getline(std::cin, line);
+        return line;
     };
 
-    constexpr auto getnumber = [](const auto msg, auto& number){
+    constexpr auto getnumber = [](const auto msg) -> uint64 {
+        uint64 number;
         std::cout << msg << " : ";
         std::cin >> number;
+        return number;
     };
 
-    Context::Resept resept;
-    getline("Dato (ÅÅÅÅMMDD)",               resept.dato);
-    getline("Pasient navn  (Jonas Solsvik)", resept.pasientNavn);
-    getline("Lege navn     (-------------)", resept.legeNavn);
-    getline("Lege addresse (Snorres veg)  ", resept.legeAdresse);
-    getline("Lege telefon  (45 20 08 77)  ", resept.legeTelefon);
-    getline("Medisin navn               ",   resept.medisinNavn);
-    getnumber("Medisin mengde i milligram",  resept.medisinMengde);
-    
-    ctx.resepter.push_back(resept);
-    return Command::SUCCESS; 
+    auto resept = new Context::Resept {
+        getline("Dato (ÅÅÅÅMMDD)"),
+        getline("Pasient navn  (Jonas Solsvik)"),
+        getline("Lege navn     (-------------)"),
+        getline("Lege addresse (Snorres veg)  "),
+        getline("Lege telefon  (45 20 08 77)  "),
+        getline("Medisin navn                 "),
+        getnumber("Medisin mengde i milligram")   
+    };
+
+    ctx.resepter.add(resept);
+    return cmd.status(Command::CONTINUE, "New resept added"); 
 };
 
 
-auto lagOversiktReseptLege(Context& ctx) -> Command::ReturnCode { return Command::SUCCESS; };
-auto lagOversiktReseptPasient(Context& ctx) -> Command::ReturnCode { return Command::SUCCESS; };
-auto lagOversiktMedisinBruk(Context& ctx) -> Command::ReturnCode { return Command::SUCCESS; };
-auto fjernGamleResepter(Context& ctx) -> Command::ReturnCode { return Command::SUCCESS; };
+auto lagOversiktReseptLege(Command& cmd, Context& ctx) -> Command::ReturnCode { return Command::CONTINUE; };
+auto lagOversiktReseptPasient(Command& cmd, Context& ctx) -> Command::ReturnCode { return Command::CONTINUE; };
+auto lagOversiktMedisinBruk(Command& cmd, Context& ctx) -> Command::ReturnCode { return Command::CONTINUE; };
+auto fjernGamleResepter(Command& cmd, Context& ctx) -> Command::ReturnCode { return Command::CONTINUE; };
 
-auto lesFraFil(Context& ctx) -> Command::ReturnCode
+auto lesFraFil(Command& cmd, Context& ctx) -> Command::ReturnCode
 { 
-    std::ifstream innfil("../resept.dta", std::ios::binary);                                         
+    std::ifstream innfil(DATAFILE, std::ios::binary);                                         
     if (!innfil) {
-        return Command::EXIT;
-    }    
+        return cmd.status(Command::EXIT, "Datafile not exist. Could not read. Please create resept.dta file and restart the app. Exiting!");
+    }
 
     innfil.seekg (0, innfil.end);
 
     uint32 length = innfil.tellg();
-    uint32 reseptCount = length/sizeof(Context::Resept);
+    uint32 reseptCount = length/sizeof(*(ctx.resepter.begin()));
 
     // Is file empty
     if (reseptCount == 0) {
-        return Command::ABORT;
+        return cmd.status(Command::CONTINUE, "The file innfile is empty. No resepts fround.");
     }
 
     JET::printline("Fant", reseptCount, "resepter på fil!");
     innfil.seekg (0, innfil.beg);
-    ctx.resepter.resize(reseptCount);
-    innfil.read((char*) ctx.resepter.data(), sizeof(Context::Resept) * ctx.resepter.size());
+    
+    for (uint32 i = 0; i < reseptCount; ++i) {
+        auto resept = new Context::Resept{};
+        innfil.read((char*) resept, sizeof(Context::Resept));
+        ctx.resepter.add(resept);
+    } 
 
-    return Command::SUCCESS;
+    return cmd.status(Command::CONTINUE, "Finished reading file.");
 }
 
 
-auto skrivTilFil(Context& ctx) -> Command::ReturnCode { 
-    std::ofstream utfil("../resept.dta", std::ios::binary);
+auto skrivTilFil(Command& cmd, Context& ctx) -> Command::ReturnCode { 
+    std::ofstream utfil(DATAFILE, std::ios::binary);
     if (!utfil) {
-        return Command::EXIT;
+        return cmd.status(Command::EXIT, "Datafile not exist. Could not write. Please create file resept.dta and restart the app. EXITING!");
     }  
-    utfil.write((char*) ctx.resepter.data(), sizeof(Context::Resept) * ctx.resepter.size());
-    return Command::SUCCESS;
+    
+    for(const auto& resept : ctx.resepter) {
+        utfil.write((char*) &resept, sizeof(Context::Resept));
+    }
+    return cmd.status(Command::CONTINUE, "Finished writing to file");
 }
 
-auto hjelp(Context& ctx) -> Command::ReturnCode { return Command::SUCCESS; };
-auto quit(Context& ctx) -> Command::ReturnCode { return Command::EXIT; };
+auto hjelp(Command& cmd, Context& ctx) -> Command::ReturnCode { return cmd.status(Command::CONTINUE, "Showing valid commands"); };
+auto quit(Command& cmd, Context& ctx) -> Command::ReturnCode { return cmd.status(Command::EXIT, "Quitting app..."); };
 } // ACTION END
 
 
@@ -183,62 +231,41 @@ auto quit(Context& ctx) -> Command::ReturnCode { return Command::EXIT; };
 int main() {
     Context ctx{};
     const std::vector<Command> validCommands = {
-        {Command::REGISTRER, Action::registrerNyResept,
-            "Registrer en ny resept",                                   // help text
-            "Ny resept registert",                                      // success text
-            "",                                                         // exit text
-            "Registrering av resept mislykket, venligst prøv igjen.."}, // success abort
+        {Command::REGISTRER, Action::registrerNyResept, 
+            "Registrer en ny resept"},
 
         {Command::LAG_OVERSIKT, Action::lagOversiktReseptLege,    
-            "Lag oversikt over reseptene fra en bestemt lege", 
-            "", 
-            "",                                                  
-            "Ingen resepter på denne legen"}, 
+            "Lag oversikt over reseptene fra en bestemt lege" },
 
         {Command::PASIENT_OVERSIKT, Action::lagOversiktReseptPasient, 
-            "Lag oversikt over resepter til en bestemt pasient", 
-            "",
-            "",                           
-            "Ingen resepter på denne pasienten"}, 
+            "Lag oversikt over resepter til en bestemt pasient"}, 
 
         {Command::MEDISIN_OVERSIKT, Action::lagOversiktMedisinBruk,   
-            "Lag oversikt over bruk av bestemte medisiner", 
-            "",
-            "",
-            "Ingen resepter finnes i databasen"},
+            "Lag oversikt over bruk av bestemte medisiner"},
 
         {Command::FJERN, Action::fjernGamleResepter,       
-            "Fjern alle gamle resepter", 
-            "Fjernet alle gamle resepter",
-            "",
-            "All resepter er allerede fjernet"},
+            "Fjern alle gamle resepter"},
 
         {Command::UT_TIL_FIL, Action::skrivTilFil, 
-            "Skriv ut til fil", 
-            "Skriving til fil gikk bra", 
-            "Skriving til fil var mislykket. Avslutter applikasjon...",
-            ""},
+            "Skriv ut til fil"},
 
         {Command::INN_FRA_FIL, Action::lesFraFil, 
-            "Les inn fra fil", 
-            "Lesing fra fil gikk bra", 
-            "Lesing fra fil var mislykket. Avslutter applikasjon...", 
-            "Ingenting på fil, avbryter lesing fra fil.."},
+            "Les inn fra fil"},
 
         {Command::HJELP, Action::hjelp, 
-            "Hjelp", 
-            "Skriver ut liste med kommandoer",
-            "",
-            ""},
+            "Hjelp"},
 
         {Command::QUIT, Action::quit, 
-            "Quit",  
-            "", 
-            "Quitting...",
-            ""}
+            "Quit"}
     };
 
-    Action::lesFraFil(ctx);
+    {   // Load datastructure from file
+        auto cmd = validCommands[Command::iINN_FRA_FIL];
+        auto status = cmd.action(cmd, ctx);
+        JET::printline(cmd.textStatus);
+        if(status == Command::EXIT)
+            return 0;
+    }
     for(;;) {
 
         constexpr auto readValidCommand = [](const auto& validCommands) -> Command {
@@ -272,22 +299,18 @@ int main() {
         auto command = readValidCommand(validCommands);
         JET::printline("Running", command.textHelp);        
         
-        auto status = command.action(ctx);
+        auto status = command.action(command, ctx);
+        JET::printline(command.textStatus);
 
-        // Exit program
-        if (status == Command::EXIT) { 
-            JET::printline(command.textExit);
-            break;            
-        } else
-        // Abort current command, and ask for new command         
-        if (status == Command::ABORT) {
-            JET::printline(command.textAbort);
-            continue;
-        }    
-        JET::printline(command.textSuccess);        
+        if (status == Command::EXIT)
+            break;
     
-    } // END FOR
-    
-    Action::skrivTilFil(ctx);
+    }
+
+    { // Dump datastructure to file
+        auto cmd = validCommands[Command::iUT_TIL_FIL];
+        cmd.action(cmd, ctx);
+        JET::printline(cmd.textStatus);
+    }
     return 0;
 }
