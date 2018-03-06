@@ -11,9 +11,11 @@ set_target_properties(oblig3
 
 target_compile_options(oblig3
     PRIVATE "-Wall"
+    PRIVATE "-Wno-unused-parameter"
     PRIVATE "-Wextra")
 
 target_compile_features(oblig3
     PRIVATE cxx_lambdas
     PRIVATE cxx_generic_lambdas
+    PRIVATE cxx_variadic_templates
 )
