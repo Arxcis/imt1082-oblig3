@@ -5,11 +5,54 @@
 #include <cctype>
 #include <cstdint>
 
+#include "ListTool2a.h"
+
 using uint8  = std::uint8_t;
 using uint32 = std::uint32_t;    
 using uint64 = std::uint64_t;        
 
-namespace jet {
+//
+// @namespace JET - Jonas epic templates
+//
+namespace JET { 
+
+//
+// @class Listx
+// @brief A class which wraps the ListTool class by inheriting from it. 
+//         I am doing this for 2 reasons:
+//         Reason1: I want to delete the default constructor to make it super clear
+//                  (with compiler error) that the default constructor is not supposed to be used.
+//         Reason2: I want to implement the std::forward_iterator concept, which makes it possible
+//                  to use the list container with C++ 11 range-for loops.
+//         Bonus:   By implementing std::forward_iterator I also get to use the list with many
+//                  standard <algorithm> functions such as: std::count_if, std::partition,
+//                  std::binary_search, std::find_if and many more.
+//
+template<class ElementType>
+class Listx : public List
+{
+    static_assert(std::is_base_of<Element, ElementType>::value, 
+        "ElementType must inherit from Element, NumElement or TextElement");
+
+    // @doc - https://stackoverflow.com/a/28926968/6292603 - 06.03.18
+    struct iterator {
+        Node* node;
+        auto operator++() -> iterator&                { node = node->next;  return *this;  }
+        auto operator++(int) -> iterator              { node = node->next;  return *this;  }
+        bool operator!=(const iterator& other) const  { return node != other.node; }
+        bool operator==(const iterator& other) const  { return node == other.node;  }
+        auto operator*() -> ElementType&              { return *(ElementType*)node->listElement; }
+        auto operator*() const -> const ElementType&  { return *(ElementType*)node->listElement; }
+        auto operator->() -> ElementType*             { return (ElementType*)node->listElement;  }
+        auto operator->() const -> const ElementType* { return (ElementType*)node->listElement;  }
+    };
+    Listx() = delete;
+    Listx(ListType li): List(li) { std::cout << "Created ListEx\n"; }
+    
+    auto begin() const -> iterator { return iterator{ this->first }; }
+    auto end()   const -> iterator { return iterator{ this->last }; }
+};
+
 template<class Arg>
 constexpr void printline(Arg arg) {  
     std::cout << arg << '\n';    
@@ -113,7 +156,7 @@ auto lesFraFil(Context& ctx) -> Command::ReturnCode
         return Command::ABORT;
     }
 
-    jet::printline("Fant", reseptCount, "resepter på fil!");
+    JET::printline("Fant", reseptCount, "resepter på fil!");
     innfil.seekg (0, innfil.beg);
     ctx.resepter.resize(reseptCount);
     innfil.read((char*) ctx.resepter.data(), sizeof(Context::Resept) * ctx.resepter.size());
@@ -201,10 +244,10 @@ int main() {
         constexpr auto readValidCommand = [](const auto& validCommands) -> Command {
         
             constexpr auto printValidCommands = [](const auto& validCommands) {
-                jet::printline("\nCommand list:                             ");
-                jet::printline("--------------------------------------------");
+                JET::printline("\nCommand list:                             ");
+                JET::printline("--------------------------------------------");
                 for (const auto& c : validCommands) {
-                    jet::printline(" ", c.character, ":", c.textHelp);
+                    JET::printline(" ", c.character, ":", c.textHelp);
                 }
             };
 
@@ -214,7 +257,7 @@ int main() {
                 std::getline(std::cin, input);
                 // 1. Check if length is correct
                 if (input.size() > 1 || input.size() < 1) {
-                    jet::printline("Bad command, too many characters...");
+                    JET::printline("Bad command, too many characters...");
                     continue;
                 }
                 // 2. Check if input is of one of the accepted characters
@@ -222,26 +265,26 @@ int main() {
                     if (std::toupper(input[0]) == c.character)
                         return c;
                 }
-                jet::printline("Unknown command, try something else...");
+                JET::printline("Unknown command, try something else...");
             }
         };
 
         auto command = readValidCommand(validCommands);
-        jet::printline("Running", command.textHelp);        
+        JET::printline("Running", command.textHelp);        
         
         auto status = command.action(ctx);
 
         // Exit program
         if (status == Command::EXIT) { 
-            jet::printline(command.textExit);
+            JET::printline(command.textExit);
             break;            
         } else
         // Abort current command, and ask for new command         
         if (status == Command::ABORT) {
-            jet::printline(command.textAbort);
+            JET::printline(command.textAbort);
             continue;
         }    
-        jet::printline(command.textSuccess);        
+        JET::printline(command.textSuccess);        
     
     } // END FOR
     
