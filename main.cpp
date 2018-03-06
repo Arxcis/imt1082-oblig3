@@ -53,13 +53,14 @@ struct Command {
         SUCCESS, ABORT, EXIT
     };
 
-    using ActionType = ReturnCode (*)(Context&);
-    const char character{};
-    const ActionType action;  // @doc implicitly cast lamba to c-function pointer - https://stackoverflow.com/a/23616995 - 05.03.18
-    const std::string textHelp{};
-    const std::string textSuccess{};
-    const std::string textExit{};
-    const std::string textAbort{};
+    const char        character{};
+    using ActionType = ReturnCode (*)(Context&);    
+    const ActionType  action;
+    using string = std::string;    
+    const string textHelp{};
+    const string textSuccess{};
+    const string textExit{};
+    const string textAbort{};
 };
 
 
@@ -136,7 +137,6 @@ auto quit(Context& ctx) -> Command::ReturnCode { return Command::EXIT; };
 
 
 
-
 int main() {
     Context ctx{};
     const std::vector<Command> validCommands = {
@@ -201,7 +201,7 @@ int main() {
         constexpr auto readValidCommand = [](const auto& validCommands) -> Command {
         
             constexpr auto printValidCommands = [](const auto& validCommands) {
-                jet::printline("\nCommand list:          ");
+                jet::printline("\nCommand list:                             ");
                 jet::printline("--------------------------------------------");
                 for (const auto& c : validCommands) {
                     jet::printline(" ", c.character, ":", c.textHelp);
@@ -218,7 +218,7 @@ int main() {
                     continue;
                 }
                 // 2. Check if input is of one of the accepted characters
-                for (const auto c : validCommands) {
+                for (const auto& c : validCommands) {
                     if (std::toupper(input[0]) == c.character)
                         return c;
                 }
