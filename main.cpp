@@ -279,8 +279,7 @@ auto lagOversiktMedisinBruk(Command& cmd, Context& ctx) -> Command::ReturnCode {
         return cmd.status(Command::CONTINUE, "No resepts found.");
     }
     
-    return Command::CONTINUE; 
-    
+    return cmd.status(Command::CONTINUE, "Not implemented medisin oversikt yet"); 
 };
 
 //
@@ -304,7 +303,7 @@ auto fjernGamleResepter(Command& cmd, Context& ctx) -> Command::ReturnCode {
         ctx.resepter.destroy(key.c_str());
     }
 
-    return Command::CONTINUE; 
+    return cmd.status(Command::CONTINUE, "Removed " + std::to_string(removeKeys.size()) + " resepts"); 
 };
 
 //
