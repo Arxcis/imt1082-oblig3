@@ -1,3 +1,8 @@
+// @tittel    Oblig3 - imt1082 - objektorienter programmering 
+// @repo      https://github.com/Arxcis/imt1082-oblig3/blob/master/main.cpp
+// @date      07.03.2018
+// @forfatter Jonas J. Solsvik
+//
 #include <iostream>
 #include <string>
 #include <vector>
@@ -313,7 +318,8 @@ auto lesFraFil(Command& cmd, Context& ctx) -> Command::ReturnCode
 { 
     std::ifstream innfil(DATAFILE, std::ios::binary);                                         
     if (!innfil) {
-        return cmd.status(Command::EXIT, "Datafile not exist. Could not read. Please create resept.dta file and restart the app. Exiting!");
+        return cmd.status(Command::EXIT, "Datafile not exist. Could not read. Please create resept.dta file"\
+                                         "and restart the app. Exiting!");
     }
 
     uint32 reseptCount = JET::readnumber(innfil);
@@ -353,7 +359,8 @@ auto skrivTilFil(Command& cmd, Context& ctx) -> Command::ReturnCode {
     }
 
     if (!utfil) {
-        return cmd.status(Command::EXIT, "Datafile not exist. Could not write. Please create file resept.dta and restart the app. EXITING!");
+        return cmd.status(Command::EXIT, "Datafile not exist. Could not write. Please create file resept.dta"\
+                                         "and restart the app. EXITING!");
     }  
 
     JET::writeline(utfil, ctx.resepter.noOfElements());
@@ -366,7 +373,7 @@ auto skrivTilFil(Command& cmd, Context& ctx) -> Command::ReturnCode {
         JET::writeline(utfil, resept->medisinNavn);
         JET::writeline(utfil, resept->medisinMengde);
     }
-    return cmd.status(Command::CONTINUE, "Finished writing " + std::to_string(ctx.resepter.noOfElements()) + " to file.");
+    return cmd.status(Command::CONTINUE, "Finished writing " + std::to_string(ctx.resepter.noOfElements())+" to file.");
 }
 
 
