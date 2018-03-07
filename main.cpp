@@ -32,9 +32,8 @@ namespace JET {
 //                  std::binary_search, std::find_if and many more.
 //
 template<class ElementType>
-class Listx : public List
+struct Listx : public List
 {
-public:
     static_assert(std::is_base_of<Element, ElementType>::value, 
         "ElementType must inherit from Element, NumElement or TextElement");
 
@@ -120,7 +119,6 @@ struct Context {
         string medisinNavn{};
         uint64 medisinMengde{}; // milligram, mg
 
-        Resept(): TextElement("default") {}
         Resept(string _dato,
                string _pasientNavn,
                string _legeNavn,
@@ -128,7 +126,7 @@ struct Context {
                string _legeTelefon,
                string _medisinNavn,
                uint64 _medisinMengde)
-        :TextElement(_pasientNavn.c_str())
+        :TextElement(_legeNavn.c_str())
         ,dato(_dato)
         ,pasientNavn(_pasientNavn)
         ,legeNavn(_legeNavn)
@@ -139,13 +137,17 @@ struct Context {
         {}
 
         void display() const {
-            JET::printline("Dato " + dato);
-            JET::printline("Pasientnavn " + pasientNavn);
-            JET::printline("Legenavn " + legeNavn);
-            JET::printline("Legeadresse " + legeAdresse);
-            JET::printline("Legetelefon " + legeTelefon);
-            JET::printline("Medisin " + medisinNavn);
-            JET::printline("Medisin mg " + std::to_string(medisinMengde));
+            JET::printline("Dato",        dato);
+            JET::printline("Pasientnavn", pasientNavn);
+            JET::printline("Legenavn",    legeNavn);
+            JET::printline("Legeadresse", legeAdresse);
+            JET::printline("Legetelefon", legeTelefon);
+            JET::printline("Medisin",    medisinNavn);
+            JET::printline("Medisin mg", std::to_string(medisinMengde));
+        }
+
+        auto getKey() const -> std::string {
+            return text;
         }
     };
     JET::Listx<Resept> resepter{Sorted}; 
@@ -197,13 +199,29 @@ namespace Action {
 // @function
 //
 auto registrerNyResept(Command& cmd, Context& ctx) -> Command::ReturnCode { 
+    std::string legenavn =  JET::getline("Lege navn     (-------------)");
+    std::string legeadresse{};
+    std::string legetelefon{};
+
+    //Legen finnes ikke allerede
+    if ( !( ctx.resepter.inList( legenavn.c_str() )) ) {
+        legeadresse = JET::getline("Lege addresse (Snorres veg)  ");
+        legetelefon = JET::getline("Lege telefon  (45 20 08 77)  ");   
+    } 
+    // Legen finnes allerede
+    else {
+        auto resept = (Context::Resept*)(ctx.resepter.remove(legenavn.c_str()));
+        legeadresse = resept->legeAdresse;
+        legetelefon = resept->legeTelefon;
+        ctx.resepter.add(resept);
+    }
 
     auto resept = new Context::Resept {
         JET::getline("Dato (ÅÅÅÅMMDD)"),
         JET::getline("Pasient navn  (Jonas Solsvik)"),
-        JET::getline("Lege navn     (-------------)"),
-        JET::getline("Lege addresse (Snorres veg)  "),
-        JET::getline("Lege telefon  (45 20 08 77)  "),
+        legenavn,
+        legeadresse,
+        legetelefon,
         JET::getline("Medisin navn                 "),
         JET::getnumber("Medisin mengde i milligram")   
     };
@@ -274,6 +292,18 @@ auto fjernGamleResepter(Command& cmd, Context& ctx) -> Command::ReturnCode {
         return cmd.status(Command::CONTINUE, "No resepts found.");
     }
     
+    const std::string oldDate = "20160101";
+    std::vector<std::string> removeKeys{};
+    
+    for (const Context::Resept* resept : ctx.resepter) {
+        if (resept->dato < oldDate) 
+            removeKeys.push_back(resept->getKey());
+    }
+
+    for (const auto& key : removeKeys) {
+        ctx.resepter.destroy(key.c_str());
+    }
+
     return Command::CONTINUE; 
 };
 
@@ -292,10 +322,9 @@ auto lesFraFil(Command& cmd, Context& ctx) -> Command::ReturnCode
         return cmd.status(Command::CONTINUE, "The file innfile is empty. Nothing to read.");
     }
 
-    // Clear list
-    using namespace JET;
-    while(ctx.resepter.noOfElements() > 0) ctx.resepter.removeNo(ctx.resepter.noOfElements());
-
+    // Clear out when reading from file
+    while(ctx.resepter.noOfElements() > 0) 
+        ctx.resepter.removeNo(ctx.resepter.noOfElements());
 
     for (uint32 i = 0; i < reseptCount; ++i) {
 
