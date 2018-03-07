@@ -204,7 +204,7 @@ namespace Action {
 // @function
 //
 auto registrerNyResept(Command& cmd, Context& ctx) -> Command::ReturnCode { 
-    std::string legenavn =  JET::getline("Lege navn     (-------------)");
+    std::string legenavn =  JET::getline("Lege navn     (lege hansen)");
     std::string legeadresse{};
     std::string legetelefon{};
 
@@ -327,9 +327,9 @@ auto lesFraFil(Command& cmd, Context& ctx) -> Command::ReturnCode
         return cmd.status(Command::CONTINUE, "The file innfile is empty. Nothing to read.");
     }
 
-    // Clear out when reading from file
+    // Clear out exiting resepts when reading from file
     while(ctx.resepter.noOfElements() > 0) 
-        ctx.resepter.removeNo(ctx.resepter.noOfElements());
+        delete ctx.resepter.removeNo(ctx.resepter.noOfElements());
 
     for (uint32 i = 0; i < reseptCount; ++i) {
 
